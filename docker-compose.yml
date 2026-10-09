@@ -1,0 +1,48 @@
+services:
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: postgresql://cert_app:${POSTGRES_PASSWORD:-local_dev_only}@db:5432/certificates
+      STORAGE_DIR: /app/data/certificates
+      API_KEY: ${API_KEY:-}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:5000}
+      MAX_RECIPIENTS: ${MAX_RECIPIENTS:-5000}
+      WORKER_THREADS: ${WORKER_THREADS:-4}
+      WORKER_ENABLED: "true"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - certificate_data:/app/data
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health')",
+        ]
+      interval: 20s
+      timeout: 4s
+      retries: 5
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: certificates
+      POSTGRES_USER: cert_app
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_dev_only}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cert_app -d certificates"]
+      interval: 5s
+      timeout: 4s
+      retries: 10
+
+volumes:
+  certificate_data:
+  postgres_data:
